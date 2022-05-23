@@ -4,6 +4,8 @@
 #include <stdexcept>
 #include <istream>
 #include <map>
+#include <memory>
+#include <assert.h>
 
 namespace csv
 {
@@ -169,30 +171,18 @@ namespace csv
     class reader
     {
     public:
-        reader(std::istream& in, bool include_header = true, long long skip_lines = 0)
-        : _in{in}, _read_header{include_header}
+        reader(std::unique_ptr<std::istream>&& in, bool include_header = true, long long skip_lines = 0, bool skip_duplicate = true)
+        : _input(std::move(in)), _in{*_input}, _read_header{include_header}, _skip_duplicate{skip_duplicate}
         {
-            while (skip_lines--) {
-                std::string line;
-                if (!std::getline(in, line)) {
-                    throw csv::eof();
-                }
-            }
-            if (this->_read_header) {
-                std::string line;
-                if (!std::getline(in, line)) {
-                    throw csv::eof();
-                }
-                _header = split_csv_line(line);
-                // populate map
-                for (int i{}; i!=_header.size(); ++i) {
-                    _indexes[_header[i]] = i;
-                }
-                // check header coerence
-                if (_indexes.size() != _header.size()) {
-                    throw std::runtime_error("Duplicate field name in .csv");
-                }
-            }
+            skip(skip_lines);
+            handle_header();
+        }
+
+        reader(std::istream& in, bool include_header = true, long long skip_lines = 0, bool skip_duplicate = true)
+        : _in{in}, _read_header{include_header}, _skip_duplicate{skip_duplicate}
+        {
+            skip(skip_lines);
+            handle_header();
         }
 
         bool can_read() {
@@ -209,24 +199,110 @@ namespace csv
             }
         }
 
+        // retrive const reference to header column names
+        const auto& header() const {
+            if (!_read_header) {
+                throw std::logic_error("Header has not been previously read");
+            }
+            return _header;
+        }
+
+        auto header_string() const {
+            return merge_csv_line(header());
+        }
+
         line getline() {
+            using namespace std::literals;
+
             std::string line;
             if (!can_read() || !std::getline(_in, line)) {
                 throw csv::eof();
             }
-            ++_line_counter;
             auto data = split_csv_line(line);
+            if (_line_counter == 0 && !_read_header) {
+                // if first read (header was ignored)
+                // take current line
+                _line_length = data.size();
+            } else if (data.size() != _line_length) {
+                throw std::runtime_error("Malformed line "s + std::to_string(_line_counter));
+            }
+            if (_skip_duplicate) {
+                remove_duplicated_columns(data);
+            }
+            ++_line_counter;
             if (_read_header && data.size() != _header.size()) {
-                throw std::runtime_error("Malformed line " + _line_counter);
+                throw std::runtime_error("Malformed line "s + std::to_string(_line_counter));
             }
             return csv::line(_indexes, std::move(data));
         }
+
+        // skip n input lines
+        void skip(long long n) {
+            while (n--) {
+                std::string line;
+                if (!std::getline(_in, line)) {
+                    throw csv::eof();
+                }
+            }
+        }
     private:
-        // number of field for single line
+        void handle_header() {
+            if (this->_read_header) {
+                std::string line;
+                if (!std::getline(_in, line)) {
+                    throw csv::eof();
+                }
+                _header = split_csv_line(line);
+                _line_length = _header.size();
+                // populate map
+                for (int i{}, inserted{}; i!=_header.size(); ++i) {
+                    const auto& column = _header[i];
+                    if (_indexes.find(column) != _indexes.end()) {
+                        // element already exists
+                        if (_skip_duplicate) {
+                            // column should be ignored when
+                            // parsing data
+                            _duplicated_columns.push_back(i);
+                        } else {
+                            // error!
+                            throw std::runtime_error("Duplicate field '" + column + "' in .csv");
+                        }
+                    } else {
+                        // insert new element
+                        _indexes[column] = inserted++;
+                    }
+                }
+                // remove duplicated columns by header
+                if (!_duplicated_columns.empty()) {
+                    remove_duplicated_columns(_header);
+                }
+                // check header coerence
+                if (!_skip_duplicate && _indexes.size() != _header.size()) {
+                    throw std::runtime_error("Duplicate field name in .csv");
+                }
+            }
+        }
+
+        // if duplicated colums were to be ignore,
+        // remove them
+        void remove_duplicated_columns(std::vector<std::string>& data) {
+            if (_skip_duplicate) {
+                for (auto it = _duplicated_columns.rbegin(); it != _duplicated_columns.rend(); ++it) {
+                    data.erase(data.begin() + *it);
+                }
+            }
+        }
+
+        // number of field for single line,
+        // calculated before removing duplicate
+        // columns
         int _line_length{};
         // count the number of parsed lines
         decltype(0LL) _line_counter{};
         // input stream
+        // used to take stream ownership
+        std::unique_ptr<std::istream> _input;
+        // use a reference to caputer all cases
         std::istream& _in;
         // first csv line is header
         bool _read_header = true;
@@ -235,5 +311,13 @@ namespace csv
         std::map<std::string, int> _indexes;
         // header
         std::vector<std::string> _header;
+
+        // should column with duplicated names
+        // be ignored in csv?
+        // valid only if _read_header
+        bool _skip_duplicate;
+        // if _read_header && !_skip_duplicate
+        // contains indexes of columns to be skipped
+        std::vector<int> _duplicated_columns;
     };
 } // namespace csv
