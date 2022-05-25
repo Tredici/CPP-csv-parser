@@ -291,27 +291,10 @@ namespace csv
         }
 
         line getline() {
-            using namespace std::literals;
-
-            std::string line;
-            if (!can_read() || !std::getline(_in, line)) {
-                throw csv::eof();
+            if (!_buffered_line.empty()) {
+                return csv::line(std::move(_buffered_line));
             }
-            auto data = split_csv_line(line);
-            if (_line_counter == 0 && !_read_header) {
-                // if first read (header was ignored)
-                // take current line
-                _line_length = data.size();
-            } else if (data.size() != _line_length) {
-                throw std::runtime_error("Malformed line "s + std::to_string(_line_counter));
-            }
-            if (_skip_duplicate) {
-                remove_duplicated_columns(data);
-            }
-            ++_line_counter;
-            if (_read_header && data.size() != _header.size()) {
-                throw std::runtime_error("Malformed line "s + std::to_string(_line_counter));
-            }
+            auto data = getline_internal();
             return csv::line(_indexes, std::move(data));
         }
 
@@ -323,6 +306,16 @@ namespace csv
                     throw csv::eof();
                 }
             }
+        }
+
+        // Number of columns available in the .csv
+        auto column_count() const {
+            return _line_length;
+        }
+
+        // Return the number of data line read
+        auto line_count() const {
+            return _line_counter - !_buffered_line.empty();
         }
     private:
         void handle_header() {
@@ -359,7 +352,39 @@ namespace csv
                 if (!_skip_duplicate && _indexes.size() != _header.size()) {
                     throw std::runtime_error("Duplicate field name in .csv");
                 }
+            } else {
+                // read first data row
+                _buffered_line = getline_internal();
             }
+            // check 
+            if (!_line_length) {
+                throw std::runtime_error("Initial line found empty");
+            }
+        }
+
+        std::vector<std::string> getline_internal() {
+            using namespace std::literals;
+
+            std::string line;
+            if (!can_read() || !std::getline(_in, line)) {
+                throw csv::eof();
+            }
+            auto data = split_csv_line(line);
+            if (_line_counter == 0 && !_read_header) {
+                // if first read (header was ignored)
+                // take current line
+                _line_length = data.size();
+            } else if (data.size() != _line_length) {
+                throw std::runtime_error("Malformed line "s + std::to_string(_line_counter));
+            }
+            if (_skip_duplicate) {
+                remove_duplicated_columns(data);
+            }
+            ++_line_counter;
+            if (_read_header && data.size() != _header.size()) {
+                throw std::runtime_error("Malformed line "s + std::to_string(_line_counter));
+            }
+            return data;
         }
 
         // if duplicated colums were to be ignore,
@@ -398,5 +423,10 @@ namespace csv
         // if _read_header && !_skip_duplicate
         // contains indexes of columns to be skipped
         std::vector<int> _duplicated_columns;
+
+        // Buffer line potentially read to detect
+        // column number if header is not required
+        // to be read
+        std::vector<std::string> _buffered_line;
     };
 } // namespace csv
