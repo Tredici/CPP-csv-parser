@@ -131,6 +131,20 @@ namespace csv
         return ans;
     }
 
+    template <typename T>
+    std::vector<std::string> cast_line(const std::vector<T>& line) {
+        std::vector<std::string> ans; ans.reserve(line.size());
+        for (const auto& x : line) {
+            ans.push_back(std::to_string(x));
+        }
+        return ans;
+    }
+
+    template <>
+    std::vector<std::string> cast_line(const std::vector<std::string>& line) {
+        return line;
+    }
+
     class line
     {
     private:
@@ -166,6 +180,63 @@ namespace csv
         explicit operator std::string() {
             return merge_csv_line(_data);
         }
+    };
+
+    class writer
+    {
+    public:
+        writer(std::unique_ptr<std::ostream>&& out, const std::vector<std::string>& header)
+        : _output(std::move(out)), _out{*_output}, _header{header}, _line_length{header.size()}
+        {
+            write_line(header);
+        }
+
+        writer(std::ostream& out, std::size_t line_length)
+        : _out{out}, _line_length{line_length}
+        {}
+
+        writer(std::ostream& out, const std::vector<std::string>& header)
+        : _out{out}, _header{header}, _line_length{header.size()}
+        {
+            write_line(header);
+        }
+
+        auto line_length() const {
+            return _line_length;
+        }
+
+        template <typename T>
+        writer& write_line(const std::vector<T>& line) {
+            return write_line(cast_line(line));
+        }
+
+        writer& write_line(const std::vector<std::string>& line) {
+            ++_written;
+            _out << merge_csv_line(line) << '\n';
+            return *this;
+        }
+
+        auto line_count() const {
+            return _written;
+        }
+
+        auto column_count() const {
+            return _line_length;
+        }
+    private:
+        // output stream
+        // used to take stream ownership
+        std::unique_ptr<std::ostream> _output;
+        // use a reference to caputer all cases
+        std::ostream& _out;
+        // number of items per row elements
+        std::size_t _line_length{};
+        // count written lines
+        std::size_t _written{};
+        // vector of column names, if empty header will not be included
+        std::vector<std::string> _header;
+        // count the number of written lines
+        decltype(0LL) _line_counter{};
     };
 
     class reader
@@ -296,9 +367,9 @@ namespace csv
         // number of field for single line,
         // calculated before removing duplicate
         // columns
-        int _line_length{};
+        std::size_t _line_length{};
         // count the number of parsed lines
-        decltype(0LL) _line_counter{};
+        std::size_t _line_counter{};
         // input stream
         // used to take stream ownership
         std::unique_ptr<std::istream> _input;
@@ -315,7 +386,7 @@ namespace csv
         // should column with duplicated names
         // be ignored in csv?
         // valid only if _read_header
-        bool _skip_duplicate;
+        bool _skip_duplicate = false;
         // if _read_header && !_skip_duplicate
         // contains indexes of columns to be skipped
         std::vector<int> _duplicated_columns;
