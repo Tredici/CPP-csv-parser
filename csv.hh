@@ -186,7 +186,7 @@ namespace csv
     {
     public:
         writer(std::unique_ptr<std::ostream>&& out, const std::vector<std::string>& header)
-        : _output(std::move(out)), _out{*_output}, _header{header}, _line_length{header.size()}
+        : _output(std::move(out)), _out{*_output}, _header{header}, _line_length{header.size()}, _header_written{true}
         {
             write_line(header);
         }
@@ -196,7 +196,7 @@ namespace csv
         {}
 
         writer(std::ostream& out, const std::vector<std::string>& header)
-        : _out{out}, _header{header}, _line_length{header.size()}
+        : _out{out}, _header{header}, _line_length{header.size()}, _header_written{true}
         {
             write_line(header);
         }
@@ -216,8 +216,14 @@ namespace csv
             return *this;
         }
 
+        // Return total number of written lines, header included
         auto line_count() const {
             return _written;
+        }
+
+        // Return number of written lines, header escluded
+        auto row_count() const {
+            return decltype(_written)(_written - _header_written);
         }
 
         auto column_count() const {
@@ -237,6 +243,8 @@ namespace csv
         std::vector<std::string> _header;
         // count the number of written lines
         decltype(0LL) _line_counter{};
+        // was header written
+        bool _header_written{};
     };
 
     class reader
