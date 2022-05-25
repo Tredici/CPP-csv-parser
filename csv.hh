@@ -157,12 +157,12 @@ namespace csv
     public:
         // with header
         line(const std::map<std::string, int>& indexes, decltype(_data)&& data)
-        : _indexes{indexes}, _data{data}
+        : _indexes{indexes}, _data{std::move(data)}
         {}
 
         // without header
         line(decltype(_data)&& data)
-        : _indexes{std::map<std::string, int>()}, _data{data}
+        : _indexes{std::map<std::string, int>()}, _data{std::move(data)}
         {}
 
         const std::string& operator[](const std::string& key) const {
