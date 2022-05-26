@@ -332,7 +332,7 @@ namespace csv
                 _header = split_csv_line(line);
                 _line_length = _header.size();
                 // populate map
-                for (int i{}, inserted{}; i!=_header.size(); ++i) {
+                for (std::size_t i{}, inserted{}; i!=_header.size(); ++i) {
                     const auto& column = _header[i];
                     if (_indexes.find(column) != _indexes.end()) {
                         // element already exists
