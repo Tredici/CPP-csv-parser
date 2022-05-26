@@ -278,6 +278,11 @@ namespace csv
             }
         }
 
+        // Was the header read?
+        auto has_header() const {
+            return _read_header;
+        }
+
         // retrive const reference to header column names
         const auto& header() const {
             if (!_read_header) {
