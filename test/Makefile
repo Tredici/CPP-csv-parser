@@ -1,5 +1,5 @@
 CC:=g++
-CPPFLAGS:=-g
+CPPFLAGS:=-g -Wall -Wextra
 EXE:=
 
 all: run
