@@ -173,7 +173,7 @@ namespace csv
             return _data;
         }
 
-        const std::size_t size() const {
+        std::size_t size() const {
             return _data.size();
         }
 
