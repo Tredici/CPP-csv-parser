@@ -1,3 +1,7 @@
+
+#ifndef CSV
+#define CSV
+
 #include <vector>
 #include <string>
 #include <iostream>
@@ -435,3 +439,5 @@ namespace csv
         std::vector<std::string> _buffered_line;
     };
 } // namespace csv
+
+#endif
