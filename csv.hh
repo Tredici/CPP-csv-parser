@@ -155,22 +155,26 @@ namespace csv
         // if true indexes is valied
         bool header_included = false;
         // reference to the field into the reader
-        const std::map<std::string, int>& _indexes;
+        std::shared_ptr<const std::map<std::string, int>> _indexes;
         // contains parsed data
         decltype(split_csv_line("")) _data;
     public:
         // with header
-        line(const std::map<std::string, int>& indexes, decltype(_data)&& data)
+        line(const std::shared_ptr<std::map<std::string, int>>& indexes, decltype(_data)&& data)
+        : _indexes{indexes}, _data{std::move(data)}
+        {}
+
+        line(const std::shared_ptr<const std::map<std::string, int>>& indexes, decltype(_data)&& data)
         : _indexes{indexes}, _data{std::move(data)}
         {}
 
         // without header
         line(decltype(_data)&& data)
-        : _indexes{std::map<std::string, int>()}, _data{std::move(data)}
+        : _indexes{}, _data{std::move(data)}
         {}
 
         const std::string& operator[](const std::string& key) const {
-            return _data[_indexes.at(key)];
+            return _data[_indexes->at(key)];
         }
 
         const auto& data() const {
@@ -239,16 +243,16 @@ namespace csv
         std::unique_ptr<std::ostream> _output;
         // use a reference to caputer all cases
         std::ostream& _out;
+        // vector of column names, if empty header will not be included
+        std::vector<std::string> _header;
         // number of items per row elements
         std::size_t _line_length{};
         // count written lines
         std::size_t _written{};
-        // vector of column names, if empty header will not be included
-        std::vector<std::string> _header;
-        // count the number of written lines
-        decltype(0LL) _line_counter{};
         // was header written
         bool _header_written{};
+        // count the number of written lines
+        decltype(0LL) _line_counter{};
     };
 
     class reader
@@ -338,7 +342,7 @@ namespace csv
                 // populate map
                 for (std::size_t i{}, inserted{}; i!=_header.size(); ++i) {
                     const auto& column = _header[i];
-                    if (_indexes.find(column) != _indexes.end()) {
+                    if (_indexes->find(column) != _indexes->end()) {
                         // element already exists
                         if (_skip_duplicate) {
                             // column should be ignored when
@@ -350,7 +354,7 @@ namespace csv
                         }
                     } else {
                         // insert new element
-                        _indexes[column] = inserted++;
+                        _indexes->operator[](column) = inserted++;
                     }
                 }
                 // remove duplicated columns by header
@@ -358,7 +362,7 @@ namespace csv
                     remove_duplicated_columns(_header);
                 }
                 // check header coerence
-                if (!_skip_duplicate && _indexes.size() != _header.size()) {
+                if (!_skip_duplicate && _indexes->size() != _header.size()) {
                     throw std::runtime_error("Duplicate field name in .csv");
                 }
             } else {
@@ -421,7 +425,7 @@ namespace csv
         bool _read_header = true;
         // associate each column to its offset
         // in the csv
-        std::map<std::string, int> _indexes;
+        std::shared_ptr<std::map<std::string, int>> _indexes;
         // header
         std::vector<std::string> _header;
 
