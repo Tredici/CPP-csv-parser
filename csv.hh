@@ -339,6 +339,7 @@ namespace csv
                 }
                 _header = split_csv_line(line);
                 _line_length = _header.size();
+                _indexes = std::make_shared<std::map<std::string, int>>(std::map<std::string, int>());
                 // populate map
                 for (std::size_t i{}, inserted{}; i!=_header.size(); ++i) {
                     const auto& column = _header[i];
