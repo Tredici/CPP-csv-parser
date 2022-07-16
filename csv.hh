@@ -136,7 +136,7 @@ namespace csv
     }
 
     template <typename T>
-    std::vector<std::string> cast_line(const std::vector<T>& line) {
+    inline std::vector<std::string> cast_line(const std::vector<T>& line) {
         std::vector<std::string> ans; ans.reserve(line.size());
         for (const auto& x : line) {
             ans.push_back(std::to_string(x));
@@ -145,7 +145,7 @@ namespace csv
     }
 
     template <>
-    std::vector<std::string> cast_line(const std::vector<std::string>& line) {
+    inline std::vector<std::string> cast_line(const std::vector<std::string>& line) {
         return line;
     }
 
