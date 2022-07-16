@@ -15,7 +15,7 @@ namespace csv
 {
     class eof : public std::exception {};
 
-    std::vector<std::string> split_csv_line(const std::string& line, char delimiter = ',', char escape_char = '\\') {
+    inline std::vector<std::string> split_csv_line(const std::string& line, char delimiter = ',', char escape_char = '\\') {
         constexpr char quote = '"';
         // returned sequence of strings
         std::vector<std::string> ans;
@@ -103,7 +103,7 @@ namespace csv
         return ans;
     }
 
-    std::string merge_csv_line(const std::vector<std::string>& strings, char delimiter = ',', char escape_char = '\\', bool quoted = true) {
+    inline std::string merge_csv_line(const std::vector<std::string>& strings, char delimiter = ',', char escape_char = '\\', bool quoted = true) {
         constexpr char quote = '"';
         std::remove_const<std::remove_reference<decltype(strings)>::type>::type escaped;
         std::string ans;
