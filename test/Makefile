@@ -1,5 +1,5 @@
 CC:=g++
-CPPFLAGS:=-g -Wall -Wextra
+CPPFLAGS:=-ggdb -Wall -Wextra
 EXE:=
 
 all: run
