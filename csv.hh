@@ -15,10 +15,14 @@ namespace csv
 {
     class eof : public std::exception {};
 
-    inline std::vector<std::string> split_csv_line(const std::string& line, char delimiter = ',', char escape_char = '\\') {
+    constexpr char default_delimiter = ',';
+    constexpr char default_escape_char = '\\';
+    inline std::vector<std::string> split_csv_line(const std::string& line, char delimiter = default_delimiter, char escape_char = default_escape_char, std::size_t expected_columns = 1UL) {
         constexpr char quote = '"';
         // returned sequence of strings
         std::vector<std::string> ans;
+        // reserve space for the 
+        ans.reserve(expected_columns);
         // current item breing parsed
         std::string tmp;
         // next char must be inserted in a new string
@@ -53,7 +57,8 @@ namespace csv
             } else if (ended) {
                 // check for delimiter character
                 if (c != delimiter) {
-                    throw std::runtime_error("Malformed input");
+                    using namespace std::literals;
+                    throw std::runtime_error("Malformed input: found '"s + c + "' instead of delimiter '"s + delimiter + "'"s);
                 }
                 ended = false;
                 next_new = true;
@@ -92,7 +97,7 @@ namespace csv
         // last char cannot be an escape character, and
         // we cannot be looking for a quote
         if (escaped || quoted) {
-            throw std::runtime_error("Malformed input");
+            throw std::runtime_error("Malformed input, bad end of line");
         }
         // then, if string was not quoted and partially read it's ok and
         // must be pushed
@@ -257,6 +262,8 @@ namespace csv
 
     class reader
     {
+        const char delimiter = default_delimiter;
+        const char escape_char = default_escape_char;
     public:
         reader(std::unique_ptr<std::istream>&& in, bool include_header = true, long long skip_lines = 0, bool skip_duplicate = true)
         : _input(std::move(in)), _in{*_input}, _read_header{include_header}, _skip_duplicate{skip_duplicate}
@@ -383,7 +390,7 @@ namespace csv
             if (!can_read() || !std::getline(_in, line)) {
                 throw csv::eof();
             }
-            auto data = split_csv_line(line);
+            auto data = split_csv_line(line, delimiter, escape_char, column_count());
             if (_line_counter == 0 && !_read_header) {
                 // if first read (header was ignored)
                 // take current line
