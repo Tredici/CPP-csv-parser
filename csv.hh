@@ -21,7 +21,7 @@ namespace csv
         constexpr char quote = '"';
         // returned sequence of strings
         std::vector<std::string> ans;
-        // reserve space for the 
+        // reserve space for the
         ans.reserve(expected_columns);
         // current item breing parsed
         std::string tmp;
@@ -385,7 +385,7 @@ namespace csv
                 // read first data row
                 _buffered_line = getline_internal();
             }
-            // check 
+            // check
             if (!_line_length) {
                 throw std::runtime_error("Initial line found empty");
             }
