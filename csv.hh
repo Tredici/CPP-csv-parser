@@ -186,6 +186,14 @@ namespace csv
             return _data;
         }
 
+        /**
+         * return contained data and invalidate the object
+         * To be used for extreme hogh performances
+         */
+        auto&& access_and_invalidate() {
+            return std::move(_data);
+        }
+
         std::size_t size() const {
             return _data.size();
         }
