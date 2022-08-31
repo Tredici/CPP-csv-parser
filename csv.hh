@@ -13,7 +13,12 @@
 
 namespace csv
 {
-    class eof : public std::exception {};
+    class eof : public std::exception {
+        const char* msg = "csv::eof";
+        virtual const char* what() const throw() {
+            return msg;
+        }
+    };
 
     constexpr char default_delimiter = ',';
     constexpr char default_escape_char = '\\';
