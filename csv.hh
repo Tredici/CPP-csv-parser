@@ -20,6 +20,19 @@ namespace csv
         }
     };
 
+    inline void append_string(const std::string& line, std::vector<std::string>& ans, size_t begin, size_t end, const std::vector<size_t>& to_escape) {
+        if (to_escape.empty()) {
+            ans.emplace_back(line.begin()+begin, line.begin()+end);
+        } else {
+            ans.emplace_back(line.begin()+begin, line.begin()+to_escape.front());
+            ans.back().reserve(end-begin);
+            for (size_t i{}, size{to_escape.size()}; i+1!=size; ++i) {
+                ans.back() += std::string(line.begin()+to_escape[i]+1, line.begin()+to_escape[i+1]);
+            }
+            ans.back() += std::string(line.begin()+to_escape.back()+1, line.begin()+end);
+        }
+    }
+
     constexpr char default_delimiter = ',';
     constexpr char default_escape_char = '\\';
     inline std::vector<std::string> split_csv_line(const std::string& line, char delimiter = default_delimiter, char escape_char = default_escape_char, std::size_t expected_columns = 1UL) {
@@ -28,8 +41,6 @@ namespace csv
         std::vector<std::string> ans;
         // reserve space for the
         ans.reserve(expected_columns);
-        // current item breing parsed
-        std::string tmp;
         // next char must be inserted in a new string
         bool next_new = true;
         // is current item quoted?
@@ -39,23 +50,32 @@ namespace csv
         bool ended = false;
         // escape character found, next char should be captured as is
         bool escaped = false;
+        // begin of a new string
+        size_t begin {};
+        // to start from 0 at the first iteration
+        size_t position{~(size_t)0};
+        // escaped characters
+        std::vector<size_t> to_escape;
         for (auto c : line) {
+            ++position;
             // handle begin of a new string
             if (next_new) {
+                to_escape.clear();
                 next_new = false;
                 // new character of string
                 // is this quoted?
                 if (c == quote) {
                     // will read until a new quote "
                     quoted = true;
+                    begin = position+1;
                 } else if (c == delimiter) {
                     // empty string found! delimiter caracter found
-                    ans.push_back(std::string());
+                    ans.emplace_back("");
                     // next will be new!
                     next_new = true;
                 } else {
-                    // add char to string
-                    tmp.push_back(c);
+                    // beginning of a new string string
+                    begin = position;
                 }
             // handle termination of a string, when a delimiter is expected
             // If delimiter is escaped it should be ignored
@@ -73,14 +93,14 @@ namespace csv
                 ended = false;
                 next_new = true;
                 // add to list
-                ans.push_back(std::move(tmp));
+                append_string(line, ans, begin, position, to_escape);
             // found non-escaped escape character, next char must be get as is
             } else if (c == escape_char && !escaped) {
                 escaped = true;
+                to_escape.push_back(position);
             // take char as is
             } else if (escaped) {
                 escaped = false;
-                tmp.push_back(c);
             // found a quote
             } else if (c == quote) {
                 // if this string was not quoted this is a mess!
@@ -92,10 +112,8 @@ namespace csv
                 // and next char should be a delimiter or end of line
                 ended = true;
                 // now string should be pushed
-                ans.push_back(std::move(tmp));
+                append_string(line, ans, begin, position, to_escape);
             // take char after having verified all previous check
-            } else {
-                tmp.push_back(c);
             }
         }
         // check status is coherent with end of line
@@ -107,7 +125,7 @@ namespace csv
         // then, if string was not quoted and partially read it's ok and
         // must be pushed
         if (!next_new && !ended) {
-            ans.push_back(std::move(tmp));
+            append_string(line, ans, begin, position+1, to_escape);
         }
 
         return ans;
@@ -227,6 +245,26 @@ namespace csv
             write_line(header);
         }
 
+        auto& disable_quotes() {
+            _quoted = false;
+            return *this;
+        }
+
+        auto& enable_quotes() {
+            _quoted = true;
+            return *this;
+        }
+
+        auto& set_escape_char(char escape_char) {
+            _escape_char = escape_char;
+            return *this;
+        }
+
+        auto& set_delimiter(char delimiter) {
+            _delimiter = delimiter;
+            return *this;
+        }
+
         auto line_length() const {
             return _line_length;
         }
@@ -238,7 +276,7 @@ namespace csv
 
         writer& write_line(const std::vector<std::string>& line) {
             ++_written;
-            _out << merge_csv_line(line) << '\n';
+            _out << merge_csv_line(line, _delimiter, _escape_char, _quoted) << '\n';
             return *this;
         }
 
@@ -271,6 +309,10 @@ namespace csv
         bool _header_written{};
         // count the number of written lines
         decltype(0LL) _line_counter{};
+        // output formatting
+        char _delimiter{','};
+        char _escape_char{'\\'};
+        bool _quoted{true};
     };
 
     class reader
